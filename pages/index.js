@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
+import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { auth, provider } from '../lib/firebase';
+
 
 export default function Home() {
+  const [user, setUser] = useState(null);
   const [topic, setTopic] = useState('');
   const [depth, setDepth] = useState('Beginner');
   const [days, setDays] = useState(5);
@@ -10,6 +14,29 @@ export default function Home() {
   const [currentDay, setCurrentDay] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [showCongrats, setShowCongrats] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const loginWithGoogle = async () => {
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (err) {
+      console.error("Login failed:", err);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -38,7 +65,6 @@ export default function Home() {
   };
 
   const current = curriculum[currentDay];
-
   const allAnswered = current?.mcqs?.length > 0 &&
     Object.keys(selectedAnswers).length === current.mcqs.length;
 
@@ -70,42 +96,60 @@ export default function Home() {
       <div className="max-w-xl mx-auto bg-gray-800 p-8 rounded-xl shadow">
         <h1 className="text-3xl font-bold mb-6 text-center text-indigo-300">🎓 CurriBuilder</h1>
 
-        <input
-          type="text"
-          placeholder="Enter a topic (e.g., React Basics)"
-          className="w-full p-3 border mb-4 rounded bg-gray-700 text-white placeholder-gray-400"
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-        />
+        {/* User Profile */}
+        {user ? (
+          <div className="mb-4 text-center">
+            <img src={user.photoURL} className="w-12 h-12 mx-auto rounded-full mb-2" alt="Profile" />
+            <p className="text-sm mb-2">Welcome, <strong>{user.displayName}</strong></p>
+            <button onClick={logout} className="bg-red-600 text-white py-1 px-3 rounded">Logout</button>
+          </div>
+        ) : (
+          <div className="mb-4 text-center">
+            <button onClick={loginWithGoogle} className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">Sign in with Google</button>
+          </div>
+        )}
 
-        <select
-          className="w-full p-3 border mb-4 rounded bg-gray-700 text-white"
-          value={depth}
-          onChange={(e) => setDepth(e.target.value)}
-        >
-          <option>Beginner</option>
-          <option>Intermediate</option>
-          <option>Advanced</option>
-        </select>
+        {user && (
+          <>
+            <input
+              type="text"
+              placeholder="Enter a topic (e.g., React Basics)"
+              className="w-full p-3 border mb-4 rounded bg-gray-700 text-white placeholder-gray-400"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+            />
 
-        <input
-          type="number"
-          min={1}
-          max={30}
-          className="w-full p-3 border mb-4 rounded bg-gray-700 text-white"
-          value={days}
-          onChange={(e) => setDays(parseInt(e.target.value))}
-          placeholder="Number of days to learn"
-        />
+            <select
+              className="w-full p-3 border mb-4 rounded bg-gray-700 text-white"
+              value={depth}
+              onChange={(e) => setDepth(e.target.value)}
+            >
+              <option>Beginner</option>
+              <option>Intermediate</option>
+              <option>Advanced</option>
+            </select>
 
-        <button
-          onClick={handleGenerate}
-          disabled={loading || !topic}
-          className="w-full bg-indigo-600 text-white p-3 rounded hover:bg-indigo-700"
-        >
-          {loading ? 'Generating...' : 'Generate Curriculum'}
-        </button>
+            <input
+              type="number"
+              min={1}
+              max={30}
+              className="w-full p-3 border mb-4 rounded bg-gray-700 text-white"
+              value={days}
+              onChange={(e) => setDays(parseInt(e.target.value))}
+              placeholder="Number of days to learn"
+            />
 
+            <button
+              onClick={handleGenerate}
+              disabled={loading || !topic}
+              className="w-full bg-indigo-600 text-white p-3 rounded hover:bg-indigo-700"
+            >
+              {loading ? 'Generating...' : 'Generate Curriculum'}
+            </button>
+          </>
+        )}
+
+        {/* Curriculum Display */}
         {curriculum.length > 0 && current && (
           <div className="mt-6 space-y-4">
             <div className="p-4 border rounded bg-gray-700">
@@ -203,7 +247,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* CELEBRATION MODAL */}
       {showCongrats && (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
           <div className="bg-white text-black p-6 rounded-xl text-center shadow-lg relative w-[90%] max-w-md">

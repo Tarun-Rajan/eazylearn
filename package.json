@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "canvas-confetti": "^1.9.3",
+    "firebase": "^11.9.1",
     "next": "15.3.4",
     "react": "^19.0.0",
     "react-confetti": "^6.4.0",
