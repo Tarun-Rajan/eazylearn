@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { signInWithPopup, onAuthStateChanged } from 'firebase/auth';
 import { auth, provider } from '../lib/firebase';
 import Navbar from '../components/Navbar';
 import { saveTopic, getUserTopics } from '../lib/firestore';
@@ -13,6 +13,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [showNewLesson, setShowNewLesson] = useState(false);
   const [topics, setTopics] = useState({});
+  const [file, setFile] = useState(null);
+  const [fileName, setFileName] = useState('');
   const router = useRouter();
 
   useEffect(() => {
@@ -34,15 +36,39 @@ export default function Dashboard() {
     }
   };
 
+  const handleFileChange = (e) => {
+    const uploadedFile = e.target.files[0];
+    setFile(uploadedFile);
+    setFileName(uploadedFile.name);
+  };
+
   const handleGenerate = async () => {
+    if (!topic || !file) {
+      alert('❗ Please enter topic and upload a file.');
+      return;
+    }
+
     setLoading(true);
+    const formData = new FormData();
+    formData.append('topic', topic);
+    formData.append('depth', depth);
+    formData.append('days', days);
+    formData.append('file', file);
+
     const res = await fetch('/api/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, depth, days }),
+      body: formData,
     });
 
     const data = await res.json();
+
+    if (data.error) {
+      alert('Error generating curriculum');
+      console.error(data.error);
+      setLoading(false);
+      return;
+    }
+
     await saveTopic(user.uid, topic, data.curriculum);
     const userTopics = await getUserTopics(user.uid);
     setTopics(userTopics);
@@ -52,6 +78,8 @@ export default function Dashboard() {
     setTopic('');
     setDepth('Beginner');
     setDays(5);
+    setFile(null);
+    setFileName('');
     setLoading(false);
   };
 
@@ -140,9 +168,25 @@ export default function Dashboard() {
                     placeholder="Number of days to learn"
                   />
 
+                  {/* Fancy File Upload */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-indigo-300 mb-1">
+                      📎 Upload Reference File (txt/pdf)
+                    </label>
+                    <input
+                      type="file"
+                      onChange={handleFileChange}
+                      accept=".txt,.pdf"
+                      className="w-full file:px-4 file:py-2 file:rounded file:border-none file:bg-indigo-600 file:text-white file:cursor-pointer bg-gray-700 text-gray-300"
+                    />
+                    {fileName && (
+                      <p className="text-green-400 mt-2 text-sm">✅ File Uploaded: <strong>{fileName}</strong></p>
+                    )}
+                  </div>
+
                   <button
                     onClick={handleGenerate}
-                    disabled={loading || !topic}
+                    disabled={loading}
                     className="w-full bg-indigo-600 text-white p-3 rounded hover:bg-indigo-700"
                   >
                     {loading ? 'Generating...' : 'Generate Curriculum'}
